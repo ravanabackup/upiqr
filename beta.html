@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live QR Code Error Correction Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #3498db, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        h2 {
+            color: #34495e;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #3498db;
+            font-size: 1.8em;
+        }
+
+        h3 {
+            color: #2980b9;
+            margin: 20px 0 15px 0;
+            font-size: 1.4em;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border-left: 5px solid #3498db;
+        }
+
+        .formula {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            border: 2px solid #007bff;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .formula::before {
+            content: "📐";
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5em;
+        }
+
+        .live-demo {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .demo-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        input, button, select {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: all 0.3s ease;
+        }
+
+        input {
+            border: 2px solid #ddd;
+            background: white;
+            color: #333;
+            min-width: 200px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .qr-workspace {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .qr-display {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .qr-canvas {
+            border: 3px solid #34495e;
+            border-radius: 10px;
+            margin: 15px auto;
+            display: block;
+            max-width: 100%;
+            cursor: crosshair;
+        }
+
+        .qr-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            min-height: 150px;
+            text-align: left;
+        }
+
+        .damage-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .damage-btn {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            font-size: 0.9em;
+            padding: 8px 16px;
+        }
+
+        .repair-btn {
+            background: linear-gradient(45deg, #27ae60, #229954);
+            font-size: 0.9em;
+            padding: 8px 16px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        .status-good { background: #27ae60; }
+        .status-damaged { background: #e74c3c; }
+        .status-repairing { background: #f39c12; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .upload-area {
+            border: 3px dashed #3498db;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 20px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #2980b9;
+        }
+
+        .upload-area.dragover {
+            background: rgba(52, 152, 219, 0.2);
+            border-color: #e74c3c;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .math-box {
+            background: linear-gradient(135deg, #ff9a9e, #fecfef);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 5px solid #e91e63;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .step {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: rgba(52, 152, 219, 0.3);
+            transform: translateY(-5px);
+        }
+
+        .step.complete {
+            background: rgba(39, 174, 96, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .demo-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            input, button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔲 Live QR Code Error Correction Demo</h1>
+
+        <div class="section">
+            <h2>🚀 Interactive QR Code Generator & Error Fixer</h2>
+            <div class="live-demo">
+                <div class="demo-controls">
+                    <input type="text" id="qrText" placeholder="Enter text to encode..." value="HELLO WORLD">
+                    <select id="errorLevel">
+                        <option value="L">Low (7% recovery)</option>
+                        <option value="M" selected>Medium (15% recovery)</option>
+                        <option value="Q">Quartile (25% recovery)</option>
+                        <option value="H">High (30% recovery)</option>
+                    </select>
+                    <button onclick="generateQR()">Generate QR</button>
+                </div>
+
+                <div class="step-indicator">
+                    <div class="step" id="step1">📝 Encode</div>
+                    <div class="step" id="step2">🔧 Add Redundancy</div>
+                    <div class="step" id="step3">🎯 Generate Pattern</div>
+                    <div class="step" id="step4">✅ Complete</div>
+                </div>
+
+                <div class="qr-workspace">
+                    <div class="qr-display">
+                        <h3><span class="status-indicator status-good"></span>Original QR Code</h3>
+                        <canvas id="originalQR" class="qr-canvas" width="300" height="300"></canvas>
+                        <div class="qr-info" id="originalInfo">Generate a QR code to start...</div>
+                    </div>
+
+                    <div class="qr-display">
+                        <h3><span class="status-indicator status-damaged"></span>Damaged QR Code</h3>
+                        <canvas id="damagedQR" class="qr-canvas" width="300" height="300"></canvas>
+                        <div class="damage-controls">
+                            <button class="damage-btn" onclick="addRandomDamage(10)">Light Damage (10%)</button>
+                            <button class="damage-btn" onclick="addRandomDamage(20)">Heavy Damage (20%)</button>
+                            <button class="damage-btn" onclick="addRandomDamage(30)">Extreme Damage (30%)</button>
+                            <button class="damage-btn" onclick="addCustomDamage()">Draw Damage</button>
+                        </div>
+                        <div class="qr-info" id="damagedInfo">Click above to add damage...</div>
+                    </div>
+
+                    <div class="qr-display">
+                        <h3><span class="status-indicator status-repairing"></span>Repaired QR Code</h3>
+                        <canvas id="repairedQR" class="qr-canvas" width="300" height="300"></canvas>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="repairProgress"></div>
+                        </div>
+                        <button class="repair-btn" onclick="repairQR()" id="repairBtn">🔧 Repair QR Code</button>
+                        <div class="qr-info" id="repairInfo">Repair damaged QR to see recovery...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📤 Upload Your Own QR Code</h2>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <h3>🖼️ Drop QR Code Image Here</h3>
+                <p>Or click to select file</p>
+                <input type="file" id="fileInput" style="display: none;" accept="image/*" onchange="handleFileUpload(event)">
+            </div>
+            
+            <div class="qr-workspace" id="uploadedQRSection" style="display: none;">
+                <div class="qr-display">
+                    <h3>📷 Uploaded QR Code</h3>
+                    <canvas id="uploadedQR" class="qr-canvas" width="300" height="300"></canvas>
+                    <div class="qr-info" id="uploadedInfo">Processing uploaded image...</div>
+                </div>
+
+                <div class="qr-display">
+                    <h3>🔍 Analysis Results</h3>
+                    <canvas id="analyzedQR" class="qr-canvas" width="300" height="300"></canvas>
+                    <button onclick="analyzeUploadedQR()">🔬 Analyze QR Code</button>
+                    <div class="qr-info" id="analysisInfo">Click analyze to inspect QR structure...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧮 Mathematical Foundation</h2>
+            
+            <div class="grid-container">
+                <div class="math-box">
+                    <h3>Reed-Solomon Error Correction</h3>
+                    <div class="formula">
+Generator Polynomial:
+g(x) = ∏(i=0 to n-k-1) (x - α^i)
+
+Where:
+- α = primitive element in GF(256)
+- n = total codeword length
+- k = message length
+- t = ⌊(n-k)/2⌋ error correction capacity
+                    </div>
+                </div>
+
+                <div class="math-box">
+                    <h3>Error Detection Algorithm</h3>
+                    <div class="formula">
+Syndrome Calculation:
+S_i = r(α^i) for i = 1,2,...,2t
+
+If all S_i = 0: No errors
+Else: Solve error locator polynomial
+Λ(x) = ∏(j=1 to v) (1 - X_j x)
+
+Error positions: α^(-i) where Λ(α^(-i)) = 0
+                    </div>
+                </div>
+            </div>
+
+            <div class="math-box">
+                <h3>Live Calculation Example</h3>
+                <div class="formula" id="liveCalculation">
+Generate a QR code to see Reed-Solomon calculations in real-time...
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 How It Works</h2>
+            <div class="grid-container">
+                <div class="math-box">
+                    <h3>1. Pattern Recognition</h3>
+                    <p>QR codes use finder patterns with a specific 1:1:3:1:1 ratio to establish orientation and size. The algorithm scans for these patterns first.</p>
+                </div>
+                
+                <div class="math-box">
+                    <h3>2. Data Extraction</h3>
+                    <p>Once patterns are found, the algorithm reads data in a zigzag pattern, applying the appropriate mask to recover the original binary data.</p>
+                </div>
+                
+                <div class="math-box">
+                    <h3>3. Error Correction</h3>
+                    <p>Reed-Solomon codes detect and correct errors by evaluating polynomials at specific points in the Galois field GF(256).</p>
+                </div>
+                
+                <div class="math-box">
+                    <h3>4. Data Recovery</h3>
+                    <p>Using syndrome decoding, the algorithm locates and corrects corrupted bits, recovering the original message even with significant damage.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentQRData = null;
+        let originalMatrix = null;
+        let damagedMatrix = null;
+        let isDrawingDamage = false;
+
+        // Simple QR-like pattern generator (simplified for demo)
+        function generateSimpleQR(text, size = 21) {
+            const matrix = Array(size).fill().map(() => Array(size).fill(0));
+            
+            // Add finder patterns (simplified)
+            addFinderPattern(matrix, 0, 0);
+            addFinderPattern(matrix, 0, size - 7);
+            addFinderPattern(matrix, size - 7, 0);
+            
+            // Add timing patterns
+            for (let i = 8; i < size - 8; i++) {
+                matrix[6][i] = i % 2;
+                matrix[i][6] = i % 2;
+            }
+            
+            // Add data (simplified encoding)
+            const data = textToBinary(text);
+            addDataToMatrix(matrix, data, size);
+            
+            return matrix;
+        }
+
+        function addFinderPattern(matrix, row, col) {
+            const pattern = [
+                [1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1]
+            ];
+            
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 7; j++) {
+                    if (row + i < matrix.length && col + j < matrix[0].length) {
+                        matrix[row + i][col + j] = pattern[i][j];
+                    }
+                }
+            }
+        }
+
+        function textToBinary(text) {
+            return text.split('').map(char => 
+                char.charCodeAt(0).toString(2).padStart(8, '0')
+            ).join('');
+        }
+
+        function addDataToMatrix(matrix, data, size) {
+            let dataIndex = 0;
+            let up = true;
+            
+            for (let col = size - 1; col > 0; col -= 2) {
+                if (col === 6) col--; // Skip timing column
+                
+                for (let row = up ? size - 1 : 0; 
+                     up ? row >= 0 : row < size; 
+                     row += up ? -1 : 1) {
+                    
+                    for (let c = 0; c < 2; c++) {
+                        const currentCol = col - c;
+                        if (currentCol >= 0 && 
+                            !isReservedArea(row, currentCol, size) && 
+                            dataIndex < data.length) {
+                            matrix[row][currentCol] = parseInt(data[dataIndex++]);
+                        }
+                    }
+                }
+                up = !up;
+            }
+        }
+
+        function isReservedArea(row, col, size) {
+            // Finder patterns
+            if ((row < 9 && col < 9) || 
+                (row < 9 && col > size - 9) || 
+                (row > size - 9 && col < 9)) return true;
+            
+            // Timing patterns
+            if (row === 6 || col === 6) return true;
+            
+            return false;
+        }
+
+        function drawMatrix(canvas, matrix) {
+            const ctx = canvas.getContext('2d');
+            const size = matrix.length;
+            const cellSize = canvas.width / size;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    ctx.fillStyle = matrix[i][j] ? '#2c3e50' : '#ecf0f1';
+                    ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                    
+                    // Add border
+                    ctx.strokeStyle = '#bdc3c7';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function generateQR() {
+            const text = document.getElementById('qrText').value || 'HELLO WORLD';
+            const errorLevel = document.getElementById('errorLevel').value;
+            
+            // Animate steps
+            animateSteps();
+            
+            // Generate QR matrix
+            originalMatrix = generateSimpleQR(text);
+            currentQRData = { text, errorLevel, matrix: originalMatrix };
+            
+            // Draw original QR
+            drawMatrix(document.getElementById('originalQR'), originalMatrix);
+            
+            // Update info
+            updateQRInfo('originalInfo', {
+                text: text,
+                errorLevel: errorLevel,
+                size: `${originalMatrix.length}x${originalMatrix.length}`,
+                capacity: calculateCapacity(errorLevel),
+                binary: textToBinary(text).substring(0, 50) + '...'
+            });
+            
+            // Clear damaged and repaired
+            const damagedCanvas = document.getElementById('damagedQR');
+            const repairedCanvas = document.getElementById('repairedQR');
+            damagedCanvas.getContext('2d').clearRect(0, 0, damagedCanvas.width, damagedCanvas.height);
+            repairedCanvas.getContext('2d').clearRect(0, 0, repairedCanvas.width, repairedCanvas.height);
+            
+            document.getElementById('damagedInfo').textContent = 'Click damage buttons to corrupt the QR code...';
+            document.getElementById('repairInfo').textContent = 'Damage the QR code first, then repair...';
+            
+            // Update live calculation
+            updateLiveCalculation(text, errorLevel);
+        }
+
+        function animateSteps() {
+            const steps = ['step1', 'step2', 'step3', 'step4'];
+            steps.forEach((step, index) => {
+                const element = document.getElementById(step);
+                element.className = 'step';
+                
+                setTimeout(() => {
+                    element.className = 'step active';
+                    setTimeout(() => {
+                        element.className = 'step complete';
+                    }, 500);
+                }, index * 300);
+            });
+        }
+
+        function updateQRInfo(elementId, info) {
+            const element = document.getElementById(elementId);
+            element.textContent = `Text: "${info.text}"
+Error Level: ${info.errorLevel}
+Size: ${info.size}
+Recovery: ${info.capacity}
+Binary: ${info.binary || 'N/A'}`;
+        }
+
+        function calculateCapacity(level) {
+            const capacities = {
+                'L': '~7% damage recovery',
+                'M': '~15% damage recovery', 
+                'Q': '~25% damage recovery',
+                'H': '~30% damage recovery'
+            };
+            return capacities[level];
+        }
+
+        function addRandomDamage(percentage) {
+            if (!originalMatrix) {
+                alert('Generate a QR code first!');
+                return;
+            }
+            
+            damagedMatrix = originalMatrix.map(row => [...row]);
+            const size = damagedMatrix.length;
+            const totalCells = size * size;
+            const damageCells = Math.floor(totalCells * percentage / 100);
+            
+            // Add random damage
+            for (let i = 0; i < damageCells; i++) {
+                const row = Math.floor(Math.random() * size);
+                const col = Math.floor(Math.random() * size);
+                
+                // Don't damage critical finder patterns
+                if (!isReservedArea(row, col, size)) {
+                    damagedMatrix[row][col] = Math.random() > 0.5 ? 1 : 0;
+                }
+            }
+            
+            drawMatrix(document.getElementById('damagedQR'), damagedMatrix);
+            
+            document.getElementById('damagedInfo').textContent = 
+                `Damaged: ${percentage}% corruption applied
+Affected cells: ${damageCells}
+Status: Needs repair
+Recovery possible: ${percentage <= 30 ? 'YES' : 'MAYBE'}`;
+        }
+
+        function addCustomDamage() {
+            if (!originalMatrix) {
+                alert('Generate a QR code first!');
+                return;
+            }
+            
+            damagedMatrix = originalMatrix.map(row => [...row]);
+            const canvas = document.getElementById('damagedQR');
+            
+            canvas.style.cursor = 'crosshair';
+            isDrawingDamage = true;
+            
+            canvas.onmousedown = startDrawing;
+            canvas.onmousemove = drawDamage;
+            canvas.onmouseup = stopDrawing;
+            
+            alert('Click and drag on the damaged QR code to add custom damage!');
+        }
+
+        function startDrawing(e) {
+            if (!isDrawingDamage) return;
+            drawDamage(e);
+        }
+
+        function drawDamage(e) {
+            if (!isDrawingDamage || e.buttons !== 1) return;
+            
+            const canvas = document.getElementById('damagedQR');
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const size = damagedMatrix.length;
+            const cellSize = canvas.width / size;
+            const row = Math.floor(y / cellSize);
+            const col = Math.floor(x / cellSize);
+            
+            if (row >= 0 && row < size && col >= 0 && col < size) {
+                // Create damage pattern
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        const newRow = row + i;
+                        const newCol = col + j;
+                        if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
+                            if (!isReservedArea(newRow, newCol, size)) {
+                                damagedMatrix[newRow][newCol] = Math.random() > 0.5 ? 1 : 0;
+                            }
+                        }
+                    }
+                }
+                
+                drawMatrix(canvas, damagedMatrix);
+            }
+        }
+
+        function stopDrawing() {
+            isDrawingDamage = false;
+            const canvas = document.getElementById('damagedQR');
+            canvas.style.cursor = 'default';
+            canvas.onmousedown = null;
+            canvas.onmousemove = null;
+            canvas.onmouseup = null;
+            
+            document.getElementById('damagedInfo').textContent = 
+                `Custom damage applied
+Status: Ready for repair
+Click repair button to fix`;
+        }
+
+        function repairQR() {
+            if (!damagedMatrix) {
+                alert('Add some damage first!');
+                return;
+            }
+            
+            const progressBar = document.getElementById('repairProgress');
+            const repairBtn = document.getElementById('repairBtn');
+            
+            repairBtn.disabled = true;
+            repairBtn.textContent = '🔧 Repairing...';
+            
+            // Simulate repair process with animation
+            let progress = 0;
+            const repairInterval = setInterval(() => {
+                progress += 2;
+                progressBar.style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(repairInterval);
+                    
+                    // Apply repair algorithm (simplified)
+                    const repairedMatrix = performReedSolomonRepair(damagedMatrix, originalMatrix);
+                    drawMatrix(document.getElementById('repairedQR'), repairedMatrix);
+                    
+                    // Calculate success rate
+                    const successRate = calculateRepairSuccess(originalMatrix, repairedMatrix);
+                    
+                    document.getElementById('repairInfo').textContent = 
+                        `Repair complete!
+Success rate: ${successRate.toFixed(1)}%
+Corrected errors: ${Math.floor((100 - successRate) * originalMatrix.length * originalMatrix.length / 100)}
+Status: ${successRate > 95 ? 'EXCELLENT' : successRate > 85 ? 'GOOD' : 'PARTIAL'}`;
+                    
+                    repairBtn.disabled = false;
+                    repairBtn.textContent = '🔧 Repair Again';
+                    
+                    setTimeout(() => {
+                        progressBar.style.width = '0%';
+                    }, 2000);
+                }
+            }, 50);
+        }
+
+        function performReedSolomonRepair(damaged, original) {
+            // Simplified repair algorithm
+            const repaired = damaged.map(row => [...row]);
+            const size = repaired.length;
+            
+            // Apply majority filter and pattern recognition
+            for (let i = 1; i < size - 1; i++) {
+                for (let j = 1; j < size - 1; j++) {
+                    if (!isReservedArea(i, j, size)) {
+                        // Check neighbors for error detection
+                        const neighbors = [
+                            damaged[i-1][j], damaged[i+1][j],
+                            damaged[i][j-1], damaged[i][j+1]
+                        ];
+                        
+                        const blackCount = neighbors.filter(n => n === 1).length;
+                        const whiteCount = neighbors.filter(n => n === 0).length;
+                        
+                        // Simple error correction based on neighbors
+                        if (Math.abs(blackCount - whiteCount) >= 2) {
+                            repaired[i][j] = blackCount > whiteCount ? 1 : 0;
+                        }
+                    }
+                }
+            }
+            
+            return repaired;
+        }
+
+        function calculateRepairSuccess(original, repaired) {
+            let correct = 0;
+            let total = 0;
+            
+            for (let i = 0; i < original.length; i++) {
+                for (let j = 0; j < original[i].length; j++) {
+                    if (!isReservedArea(i, j, original.length)) {
+                        total++;
+                        if (original[i][j] === repaired[i][j]) {
+                            correct++;
+                        }
+                    }
+                }
+            }
+            
+            return (correct / total) * 100;
+        }
+
+        function updateLiveCalculation(text, errorLevel) {
+            const binary = textToBinary(text);
+            const redundancy = {
+                'L': 0.07, 'M': 0.15, 'Q': 0.25, 'H': 0.30
+            };
+            
+            const errorBits = Math.ceil(binary.length * redundancy[errorLevel]);
+            const totalBits = binary.length + errorBits;
+            
+            document.getElementById('liveCalculation').innerHTML = `
+Current Text: "${text}"
+Binary Length: ${binary.length} bits
+Error Level: ${errorLevel} (${(redundancy[errorLevel] * 100)}% redundancy)
+Error Correction Bits: ${errorBits}
+Total Capacity: ${totalBits} bits
+
+Reed-Solomon Parameters:
+- Message length (k): ${binary.length}
+- Error correction length (n-k): ${errorBits}
+- Maximum correctable errors: ${Math.floor(errorBits / 2)}
+- Generator polynomial degree: ${errorBits}
+
+Binary Data: ${binary.substring(0, 40)}${binary.length > 40 ? '...' : ''}
+            `.trim();
+        }
+
+        // File upload handling
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    displayUploadedQR(img);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function displayUploadedQR(img) {
+            const canvas = document.getElementById('uploadedQR');
+            const ctx = canvas.getContext('2d');
+            
+            // Clear and draw uploaded image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Show the section
+            document.getElementById('uploadedQRSection').style.display = 'block';
+            
+            document.getElementById('uploadedInfo').textContent = `
+Uploaded QR Code
+Size: ${img.width} x ${img.height} pixels
+Status: Ready for analysis
+Click 'Analyze QR Code' to inspect structure`;
+        }
+
+        function analyzeUploadedQR() {
+            const canvas = document.getElementById('uploadedQR');
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Convert to black and white matrix
+            const matrix = convertToMatrix(imageData);
+            
+            // Analyze QR structure
+            const analysis = analyzeQRStructure(matrix);
+            
+            // Draw analysis on canvas
+            drawAnalysis(document.getElementById('analyzedQR'), matrix, analysis);
+            
+            // Update analysis info
+            document.getElementById('analysisInfo').textContent = `
+QR Code Analysis:
+Finder patterns found: ${analysis.finderPatterns}
+Estimated version: ${analysis.version || 'Unknown'}
+Damage detected: ${analysis.damageLevel}%
+Readability: ${analysis.readable ? 'Good' : 'Poor'}
+Recommended action: ${analysis.recommendation}
+
+Pattern Analysis:
+- Top-left finder: ${analysis.patterns.topLeft ? '✅' : '❌'}
+- Top-right finder: ${analysis.patterns.topRight ? '✅' : '❌'}
+- Bottom-left finder: ${analysis.patterns.bottomLeft ? '✅' : '❌'}
+- Timing patterns: ${analysis.patterns.timing ? '✅' : '❌'}`;
+        }
+
+        function convertToMatrix(imageData) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const matrix = [];
+            
+            for (let y = 0; y < height; y++) {
+                matrix[y] = [];
+                for (let x = 0; x < width; x++) {
+                    const index = (y * width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    
+                    // Convert to grayscale and threshold
+                    const gray = (r + g + b) / 3;
+                    matrix[y][x] = gray < 128 ? 1 : 0;
+                }
+            }
+            
+            return matrix;
+        }
+
+        function analyzeQRStructure(matrix) {
+            const analysis = {
+                finderPatterns: 0,
+                version: null,
+                damageLevel: 0,
+                readable: false,
+                recommendation: '',
+                patterns: {
+                    topLeft: false,
+                    topRight: false,
+                    bottomLeft: false,
+                    timing: false
+                }
+            };
+            
+            const size = matrix.length;
+            
+            // Check for finder patterns
+            if (checkFinderPattern(matrix, 0, 0)) {
+                analysis.finderPatterns++;
+                analysis.patterns.topLeft = true;
+            }
+            if (checkFinderPattern(matrix, 0, size - 7)) {
+                analysis.finderPatterns++;
+                analysis.patterns.topRight = true;
+            }
+            if (checkFinderPattern(matrix, size - 7, 0)) {
+                analysis.finderPatterns++;
+                analysis.patterns.bottomLeft = true;
+            }
+            
+            // Estimate version
+            if (size >= 21) {
+                analysis.version = Math.floor((size - 21) / 4) + 1;
+            }
+            
+            // Check timing patterns
+            analysis.patterns.timing = checkTimingPatterns(matrix);
+            
+            // Estimate damage level
+            analysis.damageLevel = estimateDamage(matrix);
+            
+            // Determine readability
+            analysis.readable = analysis.finderPatterns >= 2 && analysis.patterns.timing;
+            
+            // Recommendation
+            if (analysis.readable) {
+                if (analysis.damageLevel < 10) {
+                    analysis.recommendation = 'QR code is in good condition';
+                } else if (analysis.damageLevel < 25) {
+                    analysis.recommendation = 'Minor damage detected, should still scan';
+                } else {
+                    analysis.recommendation = 'Significant damage, may need repair';
+                }
+            } else {
+                analysis.recommendation = 'Major structural damage detected';
+            }
+            
+            return analysis;
+        }
+
+        function checkFinderPattern(matrix, startRow, startCol) {
+            const expectedPattern = [
+                [1,1,1,1,1,1,1],
+                [1,0,0,0,0,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,1,1,1,0,1],
+                [1,0,0,0,0,0,1],
+                [1,1,1,1,1,1,1]
+            ];
+            
+            let matches = 0;
+            let total = 0;
+            
+            for (let i = 0; i < 7; i++) {
+                for (let j = 0; j < 7; j++) {
+                    if (startRow + i < matrix.length && startCol + j < matrix[0].length) {
+                        total++;
+                        if (matrix[startRow + i][startCol + j] === expectedPattern[i][j]) {
+                            matches++;
+                        }
+                    }
+                }
+            }
+            
+            return (matches / total) > 0.8; // 80% match threshold
+        }
+
+        function checkTimingPatterns(matrix) {
+            const size = matrix.length;
+            let correctH = 0, totalH = 0;
+            let correctV = 0, totalV = 0;
+            
+            // Check horizontal timing pattern
+            for (let i = 8; i < size - 8; i++) {
+                totalH++;
+                if (matrix[6][i] === (i % 2 === 0 ? 1 : 0)) {
+                    correctH++;
+                }
+            }
+            
+            // Check vertical timing pattern
+            for (let i = 8; i < size - 8; i++) {
+                totalV++;
+                if (matrix[i][6] === (i % 2 === 0 ? 1 : 0)) {
+                    correctV++;
+                }
+            }
+            
+            return (correctH / totalH > 0.7) && (correctV / totalV > 0.7);
+        }
+
+        function estimateDamage(matrix) {
+            // Simple noise estimation
+            let noise = 0;
+            let total = 0;
+            const size = matrix.length;
+            
+            for (let i = 1; i < size - 1; i++) {
+                for (let j = 1; j < size - 1; j++) {
+                    const center = matrix[i][j];
+                    const neighbors = [
+                        matrix[i-1][j], matrix[i+1][j],
+                        matrix[i][j-1], matrix[i][j+1]
+                    ];
+                    
+                    const same = neighbors.filter(n => n === center).length;
+                    if (same < 2) noise++;
+                    total++;
+                }
+            }
+            
+            return (noise / total) * 100;
+        }
+
+        function drawAnalysis(canvas, matrix, analysis) {
+            const ctx = canvas.getContext('2d');
+            const size = matrix.length;
+            const cellSize = canvas.width / size;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw matrix with color coding
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    let color = matrix[i][j] ? '#2c3e50' : '#ecf0f1';
+                    
+                    // Highlight finder patterns
+                    if ((i < 7 && j < 7) || (i < 7 && j > size - 8) || (i > size - 8 && j < 7)) {
+                        color = analysis.patterns.topLeft || analysis.patterns.topRight || analysis.patterns.bottomLeft ? 
+                               '#27ae60' : '#e74c3c';
+                    }
+                    
+                    // Highlight timing patterns
+                    if (i === 6 || j === 6) {
+                        color = analysis.patterns.timing ? '#3498db' : '#f39c12';
+                    }
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                    
+                    ctx.strokeStyle = '#bdc3c7';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        // Drag and drop functionality
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].type.startsWith('image/')) {
+                const event = { target: { files: files } };
+                handleFileUpload(event);
+            }
+        });
+
+        // Initialize
+        window.onload = function() {
+            generateQR();
+        };
+    </script>
+</body>
+</html>
