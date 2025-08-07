@@ -4,10 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live QR Code Error Correction Demo</title>
-    <!-- qrcode.js for generating QR codes -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-    <!-- jsQR for reading QR codes -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -21,20 +17,17 @@
             color: #333;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
         }
 
         .container {
             max-width: 1400px;
-            width: 100%;
             margin: 0 auto;
             padding: 20px;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
 
@@ -259,7 +252,7 @@
             width: 0%;
             transition: width 0.3s ease;
         }
-
+        
         .math-box {
             background: linear-gradient(135deg, #ff9a9e, #fecfef);
             padding: 20px;
@@ -302,26 +295,35 @@
             background: rgba(39, 174, 96, 0.3);
         }
 
+        .camera-feed {
+            width: 100%;
+            height: auto;
+            border-radius: 15px;
+            border: 3px solid #3498db;
+        }
+
         @media (max-width: 768px) {
             .container {
                 margin: 10px;
                 padding: 15px;
             }
-            
+
             h1 {
                 font-size: 2em;
             }
-            
+
             .demo-controls {
                 flex-direction: column;
                 align-items: stretch;
             }
-            
+
             input, button {
                 width: 100%;
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -340,21 +342,18 @@
                     </select>
                     <button onclick="generateQR()">Generate QR</button>
                 </div>
-
                 <div class="step-indicator">
                     <div class="step" id="step1">📝 Encode</div>
                     <div class="step" id="step2">🔧 Add Redundancy</div>
                     <div class="step" id="step3">🎯 Generate Pattern</div>
                     <div class="step" id="step4">✅ Complete</div>
                 </div>
-
                 <div class="qr-workspace">
                     <div class="qr-display">
                         <h3><span class="status-indicator status-good"></span>Original QR Code</h3>
                         <canvas id="originalQR" class="qr-canvas" width="300" height="300"></canvas>
                         <div class="qr-info" id="originalInfo">Generate a QR code to start...</div>
                     </div>
-
                     <div class="qr-display">
                         <h3><span class="status-indicator status-damaged"></span>Damaged QR Code</h3>
                         <canvas id="damagedQR" class="qr-canvas" width="300" height="300"></canvas>
@@ -366,7 +365,6 @@
                         </div>
                         <div class="qr-info" id="damagedInfo">Click above to add damage...</div>
                     </div>
-
                     <div class="qr-display">
                         <h3><span class="status-indicator status-repairing"></span>Repaired QR Code</h3>
                         <canvas id="repairedQR" class="qr-canvas" width="300" height="300"></canvas>
@@ -381,20 +379,32 @@
         </div>
 
         <div class="section">
+            <h2>📷 Live QR Code Scanner</h2>
+            <p>Point your camera at a QR code to scan it. This uses a real decoder library, which includes automatic error correction.</p>
+            <div class="qr-workspace">
+                <div class="qr-display">
+                    <h3><span class="status-indicator status-repairing"></span>Camera Feed</h3>
+                    <video id="cameraFeed" class="camera-feed" autoplay playsinline></video>
+                    <button onclick="startScanner()">Start Camera</button>
+                    <div class="qr-info" id="cameraInfo">Click 'Start Camera' to begin scanning...</div>
+                    <canvas id="cameraCanvas" style="display:none;"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
             <h2>📤 Upload Your Own QR Code</h2>
             <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                 <h3>🖼️ Drop QR Code Image Here</h3>
                 <p>Or click to select file</p>
                 <input type="file" id="fileInput" style="display: none;" accept="image/*" onchange="handleFileUpload(event)">
             </div>
-            
             <div class="qr-workspace" id="uploadedQRSection" style="display: none;">
                 <div class="qr-display">
                     <h3>📷 Uploaded QR Code</h3>
                     <canvas id="uploadedQR" class="qr-canvas" width="300" height="300"></canvas>
                     <div class="qr-info" id="uploadedInfo">Processing uploaded image...</div>
                 </div>
-
                 <div class="qr-display">
                     <h3>🔍 Analysis Results</h3>
                     <canvas id="analyzedQR" class="qr-canvas" width="300" height="300"></canvas>
@@ -406,41 +416,38 @@
 
         <div class="section">
             <h2>🧮 Mathematical Foundation</h2>
-            
             <div class="grid-container">
                 <div class="math-box">
                     <h3>Reed-Solomon Error Correction</h3>
                     <div class="formula">
-Generator Polynomial:
-$g(x) = \prod_{i=0}^{n-k-1} (x - \alpha^i)$
+                        Generator Polynomial:
+                        g(x) = ∏(i=0 to n-k-1) (x - α^i)
 
-Where:
-- $\alpha$ = primitive element in GF(256)
-- $n$ = total codeword length
-- $k$ = message length
-- $t = \lfloor(n-k)/2\rfloor$ error correction capacity
+                        Where:
+                        - α = primitive element in GF(256)
+                        - n = total codeword length
+                        - k = message length
+                        - t = ⌊(n-k)/2⌋ error correction capacity
                     </div>
                 </div>
-
                 <div class="math-box">
                     <h3>Error Detection Algorithm</h3>
                     <div class="formula">
-Syndrome Calculation:
-$S_i = r(\alpha^i)$ for $i = 1,2,...,2t$
+                        Syndrome Calculation:
+                        S_i = r(α^i) for i = 1,2,...,2t
 
-If all $S_i = 0$: No errors
-Else: Solve error locator polynomial
-$\Lambda(x) = \prod_{j=1}^{v} (1 - X_j x)$
+                        If all S_i = 0: No errors
+                        Else: Solve error locator polynomial
+                        Λ(x) = ∏(j=1 to v) (1 - X_j x)
 
-Error positions: $\alpha^{-i}$ where $\Lambda(\alpha^{-i}) = 0$
+                        Error positions: α^(-i) where Λ(α^(-i)) = 0
                     </div>
                 </div>
             </div>
-
             <div class="math-box">
                 <h3>Live Calculation Example</h3>
                 <div class="formula" id="liveCalculation">
-Generate a QR code to see Reed-Solomon calculations in real-time...
+                    Generate a QR code to see Reed-Solomon calculations in real-time...
                 </div>
             </div>
         </div>
@@ -452,17 +459,14 @@ Generate a QR code to see Reed-Solomon calculations in real-time...
                     <h3>1. Pattern Recognition</h3>
                     <p>QR codes use finder patterns with a specific 1:1:3:1:1 ratio to establish orientation and size. The algorithm scans for these patterns first.</p>
                 </div>
-                
                 <div class="math-box">
                     <h3>2. Data Extraction</h3>
                     <p>Once patterns are found, the algorithm reads data in a zigzag pattern, applying the appropriate mask to recover the original binary data.</p>
                 </div>
-                
                 <div class="math-box">
                     <h3>3. Error Correction</h3>
                     <p>Reed-Solomon codes detect and correct errors by evaluating polynomials at specific points in the Galois field GF(256).</p>
                 </div>
-                
                 <div class="math-box">
                     <h3>4. Data Recovery</h3>
                     <p>Using syndrome decoding, the algorithm locates and corrects corrupted bits, recovering the original message even with significant damage.</p>
@@ -472,127 +476,58 @@ Generate a QR code to see Reed-Solomon calculations in real-time...
     </div>
 
     <script>
+        // Global variables for managing state
         let currentQRData = null;
-        let originalMatrix = null; // This will now store the raw binary matrix from qrcode.js
-        let damagedMatrix = null;
         let isDrawingDamage = false;
+        let animationFrameId = null;
 
-        // Function to draw a binary matrix onto a canvas
-        function drawMatrix(canvas, matrix, highlight = false) {
-            const ctx = canvas.getContext('2d');
-            const size = matrix.length;
-            const cellSize = canvas.width / size;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            for (let i = 0; i < size; i++) {
-                for (let j = 0; j < size; j++) {
-                    let color = matrix[i][j] ? '#2c3e50' : '#ecf0f1'; // Black or White
-                    
-                    if (highlight) {
-                        // Highlight finder patterns (simplified for visual demo)
-                        if ((i < 7 && j < 7) || (i < 7 && j > size - 8) || (i > size - 8 && j < 7)) {
-                            color = '#27ae60'; // Green for finder patterns
-                        }
-                        // Highlight timing patterns (simplified for visual demo)
-                        if (i === 6 || j === 6) {
-                            color = '#3498db'; // Blue for timing patterns
-                        }
-                    }
+        // --- QR Code Generation and Display ---
 
-                    ctx.fillStyle = color;
-                    ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
-                    
-                    // Add border
-                    ctx.strokeStyle = '#bdc3c7';
-                    ctx.lineWidth = 0.5;
-                    ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
-                }
-            }
-        }
-
-        // Helper to convert an image data object (from canvas.getImageData) to a binary matrix
-        function imageDataToMatrix(imageData) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            const matrix = [];
-            
-            for (let y = 0; y < height; y++) {
-                matrix[y] = [];
-                for (let x = 0; x < width; x++) {
-                    const index = (y * width + x) * 4;
-                    const r = data[index];
-                    const g = data[index + 1];
-                    const b = data[index + 2];
-                    
-                    // Convert to grayscale and threshold
-                    const gray = (r + g + b) / 3;
-                    matrix[y][x] = gray < 128 ? 1 : 0;
-                }
-            }
-            return matrix;
-        }
-
-        function generateQR() {
+        async function generateQR() {
             const text = document.getElementById('qrText').value || 'HELLO WORLD';
             const errorLevel = document.getElementById('errorLevel').value;
-            const originalCanvas = document.getElementById('originalQR');
-            const damagedCanvas = document.getElementById('damagedQR');
-            const repairedCanvas = document.getElementById('repairedQR');
 
-            // Animate steps
-            animateSteps();
-            
-            // Clear canvases before generating new QR
-            originalCanvas.getContext('2d').clearRect(0, 0, originalCanvas.width, originalCanvas.height);
-            damagedCanvas.getContext('2d').clearRect(0, 0, damagedCanvas.width, damagedCanvas.height);
-            repairedCanvas.getContext('2d').clearRect(0, 0, repairedCanvas.width, repairedCanvas.height);
-
-            // Generate QR code using qrcode.js
             try {
-                // qrcode.js draws directly to canvas. To get a matrix, we need to read it back.
-                QRCode.toCanvas(originalCanvas, text, {
-                    errorCorrectionLevel: errorLevel,
-                    margin: 1,
-                    scale: 4 // Scale up for better resolution, then read back
-                }, function (error) {
-                    if (error) {
-                        console.error('QR Code generation failed:', error);
-                        document.getElementById('originalInfo').textContent = 'Error generating QR code.';
-                        return;
-                    }
+                const dataUrl = await QRCode.toDataURL(text, {
+                    errorCorrectionLevel: errorLevel
+                });
 
-                    // Read the generated QR code back into a matrix for damage simulation
-                    const ctx = originalCanvas.getContext('2d');
-                    const imageData = ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height);
-                    originalMatrix = imageDataToMatrix(imageData);
-                    
-                    currentQRData = { text, errorLevel, matrix: originalMatrix };
-                    
-                    // Draw original QR (re-draw to ensure consistent styling if needed, or just keep the qrcode.js output)
-                    // drawMatrix(originalCanvas, originalMatrix); // Not strictly necessary if qrcode.js drew it correctly
+                const originalCanvas = document.getElementById('originalQR');
+                const ctx = originalCanvas.getContext('2d');
+                const img = new Image();
 
-                    // Update info
+                img.onload = () => {
+                    ctx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+                    ctx.drawImage(img, 0, 0, originalCanvas.width, originalCanvas.height);
+
                     updateQRInfo('originalInfo', {
                         text: text,
                         errorLevel: errorLevel,
-                        size: `${originalMatrix.length}x${originalMatrix.length}`,
+                        size: `${img.width}x${img.height}`,
                         capacity: calculateCapacity(errorLevel),
-                        binary: 'Generated by qrcode.js' // We don't have direct binary string easily
+                        binary: 'Encoded by a real QR library.'
                     });
-                    
-                    // Clear damaged and repaired
-                    document.getElementById('damagedInfo').textContent = 'Click damage buttons to corrupt the QR code...';
-                    document.getElementById('repairInfo').textContent = 'Damage the QR code first, then repair...';
-                    
-                    // Update live calculation
-                    updateLiveCalculation(text, errorLevel);
-                });
 
-            } catch (e) {
-                console.error("Error generating QR code:", e);
-                document.getElementById('originalInfo').textContent = 'Error generating QR code: ' + e.message;
+                    const damagedCanvas = document.getElementById('damagedQR');
+                    damagedCanvas.getContext('2d').clearRect(0, 0, damagedCanvas.width, damagedCanvas.height);
+                    damagedCanvas.getContext('2d').drawImage(img, 0, 0, damagedCanvas.width, damagedCanvas.height);
+
+                    const repairedCanvas = document.getElementById('repairedQR');
+                    repairedCanvas.getContext('2d').clearRect(0, 0, repairedCanvas.width, repairedCanvas.height);
+
+                    animateSteps();
+                    updateLiveCalculation(text, errorLevel);
+
+                    currentQRData = {
+                        text,
+                        errorLevel,
+                        imageData: ctx.getImageData(0, 0, originalCanvas.width, originalCanvas.height)
+                    };
+                };
+                img.src = dataUrl;
+            } catch (err) {
+                console.error(err);
+                alert('Failed to generate QR code. Check the console for details.');
             }
         }
 
@@ -600,13 +535,12 @@ Generate a QR code to see Reed-Solomon calculations in real-time...
             const steps = ['step1', 'step2', 'step3', 'step4'];
             steps.forEach((step, index) => {
                 const element = document.getElementById(step);
-                element.className = 'step'; // Reset class
-                
+                element.className = 'step';
+
                 setTimeout(() => {
-                    element.classList.add('active');
+                    element.className = 'step active';
                     setTimeout(() => {
-                        element.classList.remove('active');
-                        element.classList.add('complete');
+                        element.className = 'step complete';
                     }, 500);
                 }, index * 300);
             });
@@ -614,87 +548,73 @@ Generate a QR code to see Reed-Solomon calculations in real-time...
 
         function updateQRInfo(elementId, info) {
             const element = document.getElementById(elementId);
-            element.textContent = `Text: "${info.text}"
-Error Level: ${info.errorLevel}
-Size: ${info.size}
-Recovery: ${info.capacity}
-Info: ${info.binary || 'N/A'}`;
+            element.textContent = `Text: "${info.text}"\nError Level: ${info.errorLevel}\nSize: ${info.size}\nRecovery: ${info.capacity}\nBinary: ${info.binary || 'N/A'}`;
         }
 
         function calculateCapacity(level) {
             const capacities = {
                 'L': '~7% damage recovery',
-                'M': '~15% damage recovery', 
+                'M': '~15% damage recovery',
                 'Q': '~25% damage recovery',
                 'H': '~30% damage recovery'
             };
             return capacities[level];
         }
 
-        function addRandomDamage(percentage) {
-            if (!originalMatrix) {
-                console.warn('Generate a QR code first!');
-                document.getElementById('damagedInfo').textContent = 'Generate a QR code first!';
-                return;
-            }
-            
-            damagedMatrix = originalMatrix.map(row => [...row]);
-            const size = damagedMatrix.length;
-            const totalCells = size * size;
-            const damageCells = Math.floor(totalCells * percentage / 100);
-            
-            let damagedCount = 0;
-            // Add random damage
-            for (let i = 0; i < damageCells; i++) {
-                const row = Math.floor(Math.random() * size);
-                const col = Math.floor(Math.random() * size);
-                
-                // Avoid damaging critical finder patterns and timing patterns for a more realistic demo
-                if (!isCriticalArea(row, col, size)) {
-                    damagedMatrix[row][col] = Math.random() > 0.5 ? 1 : 0; // Flip bit randomly
-                    damagedCount++;
-                }
-            }
-            
-            drawMatrix(document.getElementById('damagedQR'), damagedMatrix);
-            
-            document.getElementById('damagedInfo').textContent = 
-                `Damaged: ${percentage}% corruption applied
-Actual affected cells: ${damagedCount}
-Status: Needs repair
-Recovery possible: ${percentage <= (currentQRData.errorLevel === 'H' ? 30 : currentQRData.errorLevel === 'Q' ? 25 : currentQRData.errorLevel === 'M' ? 15 : 7) ? 'YES (within error correction capacity)' : 'MAYBE (might exceed capacity)'}`;
+        function updateLiveCalculation(text, errorLevel) {
+            const redundancy = {
+                'L': 0.07,
+                'M': 0.15,
+                'Q': 0.25,
+                'H': 0.30
+            };
+            const textLength = text.length;
+            const errorBits = Math.ceil(textLength * 8 * redundancy[errorLevel]);
+            const totalBits = textLength * 8 + errorBits;
+
+            document.getElementById('liveCalculation').innerHTML = `Current Text: "${text}"\nBinary Length (approx): ${textLength * 8} bits\nError Level: ${errorLevel} (${(redundancy[errorLevel] * 100)}% redundancy)\nError Correction Bits: ${errorBits}\nTotal Capacity: ${totalBits} bits\n\nReed-Solomon Parameters:\n- Message length (k): (approx) ${textLength * 8}\n- Error correction length (n-k): (approx) ${errorBits}\n- Maximum correctable errors: (approx) ${Math.floor(errorBits / 2)}\n- Generator polynomial degree: (approx) ${errorBits}`;
         }
 
-        // Helper to prevent damaging critical QR elements
-        function isCriticalArea(row, col, size) {
-            // Finder patterns and quiet zone around them
-            if ((row < 9 && col < 9) || (row < 9 && col > size - 9) || (row > size - 9 && col < 9)) return true;
-            // Timing patterns
-            if (row === 6 || col === 6) return true;
-            // Alignment patterns (for larger QR codes, simplified check)
-            if (size > 21 && ((row > size - 10 && col > size - 10) || (row > size - 10 && col < 10) || (row < 10 && col > size - 10))) return true;
-            return false;
+        // --- Damage and Repair Simulation ---
+
+        function addRandomDamage(percentage) {
+            if (!currentQRData) {
+                alert('Generate a QR code first!');
+                return;
+            }
+            const damagedCanvas = document.getElementById('damagedQR');
+            const ctx = damagedCanvas.getContext('2d');
+            const damagedImageData = ctx.getImageData(0, 0, damagedCanvas.width, damagedCanvas.height);
+            
+            const totalPixels = damagedImageData.data.length / 4;
+            const damagePixels = Math.floor(totalPixels * percentage / 100);
+
+            for (let i = 0; i < damagePixels; i++) {
+                const pixelIndex = Math.floor(Math.random() * totalPixels) * 4;
+                damagedImageData.data[pixelIndex] = Math.random() * 255;
+                damagedImageData.data[pixelIndex + 1] = Math.random() * 255;
+                damagedImageData.data[pixelIndex + 2] = Math.random() * 255;
+                damagedImageData.data[pixelIndex + 3] = 255;
+            }
+            
+            ctx.putImageData(damagedImageData, 0, 0);
+            document.getElementById('damagedInfo').textContent = `Damaged: ${percentage}% corruption applied\nStatus: Needs repair\nRecovery possible: ${percentage <= 30 ? 'YES' : 'MAYBE'}`;
         }
 
         function addCustomDamage() {
-            if (!originalMatrix) {
-                console.warn('Generate a QR code first!');
-                document.getElementById('damagedInfo').textContent = 'Generate a QR code first!';
+            const canvas = document.getElementById('damagedQR');
+            if (!currentQRData) {
+                alert('Generate a QR code first!');
                 return;
             }
-            
-            damagedMatrix = originalMatrix.map(row => [...row]);
-            const canvas = document.getElementById('damagedQR');
-            
-            canvas.style.cursor = 'crosshair';
+
             isDrawingDamage = true;
-            
+            canvas.style.cursor = 'crosshair';
             canvas.onmousedown = startDrawing;
             canvas.onmousemove = drawDamage;
             canvas.onmouseup = stopDrawing;
-            canvas.onmouseleave = stopDrawing; // Stop drawing if mouse leaves canvas
-            
-            document.getElementById('damagedInfo').textContent = 'Click and drag on the damaged QR code to add custom damage!';
+
+            alert('Click and drag on the damaged QR code to add custom damage!');
         }
 
         function startDrawing(e) {
@@ -704,33 +624,14 @@ Recovery possible: ${percentage <= (currentQRData.errorLevel === 'H' ? 30 : curr
 
         function drawDamage(e) {
             if (!isDrawingDamage || e.buttons !== 1) return;
-            
             const canvas = document.getElementById('damagedQR');
+            const ctx = canvas.getContext('2d');
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
-            const size = damagedMatrix.length;
-            const cellSize = canvas.width / size;
-            const row = Math.floor(y / cellSize);
-            const col = Math.floor(x / cellSize);
-            
-            if (row >= 0 && row < size && col >= 0 && col < size) {
-                // Create damage pattern (e.g., a 3x3 square)
-                for (let i = -1; i <= 1; i++) {
-                    for (let j = -1; j <= 1; j++) {
-                        const newRow = row + i;
-                        const newCol = col + j;
-                        if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
-                            if (!isCriticalArea(newRow, newCol, size)) {
-                                damagedMatrix[newRow][newCol] = Math.random() > 0.5 ? 1 : 0; // Flip bit randomly
-                            }
-                        }
-                    }
-                }
-                
-                drawMatrix(canvas, damagedMatrix);
-            }
+
+            ctx.fillStyle = `rgb(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255})`;
+            ctx.fillRect(x - 5, y - 5, 10, 10);
         }
 
         function stopDrawing() {
@@ -740,78 +641,49 @@ Recovery possible: ${percentage <= (currentQRData.errorLevel === 'H' ? 30 : curr
             canvas.onmousedown = null;
             canvas.onmousemove = null;
             canvas.onmouseup = null;
-            canvas.onmouseleave = null;
-            
-            document.getElementById('damagedInfo').textContent = 
-                `Custom damage applied.
-Status: Ready for repair.
-Click repair button to fix.`;
+            document.getElementById('damagedInfo').textContent = `Custom damage applied\nStatus: Ready for repair\nClick repair button to fix`;
         }
 
         async function repairQR() {
-            if (!damagedMatrix) {
-                console.warn('Add some damage first!');
-                document.getElementById('repairInfo').textContent = 'Add some damage first!';
-                return;
-            }
-            
+            const damagedCanvas = document.getElementById('damagedQR');
+            const damagedCtx = damagedCanvas.getContext('2d');
+            const damagedImageData = damagedCtx.getImageData(0, 0, damagedCanvas.width, damagedCanvas.height);
+
             const progressBar = document.getElementById('repairProgress');
             const repairBtn = document.getElementById('repairBtn');
-            const repairedCanvas = document.getElementById('repairedQR');
-            const repairedCtx = repairedCanvas.getContext('2d');
-
             repairBtn.disabled = true;
             repairBtn.textContent = '🔧 Repairing...';
-            
-            // Simulate repair process with animation
+
             let progress = 0;
-            progressBar.style.width = '0%'; // Reset progress bar
-            const repairInterval = setInterval(() => {
+            const repairInterval = setInterval(async () => {
                 progress += 2;
                 progressBar.style.width = progress + '%';
-                
+
                 if (progress >= 100) {
                     clearInterval(repairInterval);
-                    
-                    // Convert damaged matrix back to imageData for jsQR
-                    const damagedTempCanvas = document.createElement('canvas');
-                    damagedTempCanvas.width = damagedMatrix.length;
-                    damagedTempCanvas.height = damagedMatrix.length;
-                    drawMatrix(damagedTempCanvas, damagedMatrix); // Draw to temp canvas
-                    const damagedImageData = damagedTempCanvas.getContext('2d').getImageData(0, 0, damagedTempCanvas.width, damagedTempCanvas.height);
 
-                    // Attempt to decode the damaged QR code using jsQR
                     const code = jsQR(damagedImageData.data, damagedImageData.width, damagedImageData.height);
+                    const repairedCanvas = document.getElementById('repairedQR');
+                    const repairedCtx = repairedCanvas.getContext('2d');
+                    repairedCtx.clearRect(0, 0, repairedCanvas.width, repairedCanvas.height);
 
                     if (code) {
-                        // If successfully decoded, generate a new QR from the recovered data
-                        repairedCtx.clearRect(0, 0, repairedCanvas.width, repairedCanvas.height);
-                        QRCode.toCanvas(repairedCanvas, code.data, {
-                            errorCorrectionLevel: currentQRData.errorLevel,
-                            margin: 1,
-                            scale: 4
-                        }, function (error) {
-                            if (error) {
-                                console.error('Error re-generating repaired QR:', error);
-                                document.getElementById('repairInfo').textContent = 'Repair failed: Could not re-generate QR.';
-                            } else {
-                                document.getElementById('repairInfo').textContent = 
-                                    `Repair complete!
-Decoded Text: "${code.data}"
-Version: ${code.version}
-Error Correction Level: ${code.version > 0 ? code.errorCorrectionLevel : 'N/A'}
-Status: SUCCESS (QR code recovered!)`;
-                            }
+                        const repairedDataUrl = await QRCode.toDataURL(code.data, {
+                            errorCorrectionLevel: currentQRData.errorLevel
                         });
+
+                        const repairedImg = new Image();
+                        repairedImg.onload = () => {
+                            repairedCtx.drawImage(repairedImg, 0, 0, repairedCanvas.width, repairedCanvas.height);
+                            document.getElementById('repairInfo').textContent = `Repair complete!\nDecoded Text: "${code.data}"\nStatus: SUCCESS`;
+                        };
+                        repairedImg.src = repairedDataUrl;
                     } else {
-                        document.getElementById('repairInfo').textContent = `Repair failed!
-Could not decode QR code.
-Damage might be too extensive for current error correction level.`;
+                        document.getElementById('repairInfo').textContent = `Repair failed.\nDamage too severe to be corrected with a level of ${currentQRData.errorLevel}`;
                     }
-                    
+
                     repairBtn.disabled = false;
                     repairBtn.textContent = '🔧 Repair Again';
-                    
                     setTimeout(() => {
                         progressBar.style.width = '0%';
                     }, 2000);
@@ -819,37 +691,63 @@ Damage might be too extensive for current error correction level.`;
             }, 50);
         }
 
-        function updateLiveCalculation(text, errorLevel) {
-            // This section is illustrative, as qrcode.js handles actual encoding details.
-            // We can provide a theoretical estimate based on the text length and error level.
-            const textLength = text.length;
-            const redundancyFactor = { 'L': 0.07, 'M': 0.15, 'Q': 0.25, 'H': 0.30 }[errorLevel];
-            
-            // Simplified estimation for demonstration
-            const estimatedDataBits = textLength * 8; // Roughly 8 bits per character
-            const estimatedErrorCorrectionBits = Math.ceil(estimatedDataBits * redundancyFactor / (1 - redundancyFactor));
-            const estimatedTotalBits = estimatedDataBits + estimatedErrorCorrectionBits;
+        // --- Live Camera Scanner ---
 
-            document.getElementById('liveCalculation').innerHTML = `
-Current Text: "${text}"
-Estimated Data Bits: ${estimatedDataBits}
-Error Level: ${errorLevel} (${(redundancyFactor * 100).toFixed(0)}% redundancy)
-Estimated Error Correction Bits: ${estimatedErrorCorrectionBits}
-Estimated Total Bits: ${estimatedTotalBits}
+        async function startScanner() {
+            const video = document.getElementById('cameraFeed');
+            const canvas = document.getElementById('cameraCanvas');
+            const ctx = canvas.getContext('2d');
+            const infoElement = document.getElementById('cameraInfo');
 
-Reed-Solomon Parameters (Conceptual):
-- Message length (k): Approx. ${estimatedDataBits}
-- Error correction length (n-k): Approx. ${estimatedErrorCorrectionBits}
-- Maximum correctable errors: Approx. ${Math.floor(estimatedErrorCorrectionBits / 2)}
-- Generator polynomial degree: Approx. ${estimatedErrorCorrectionBits}
-            `.trim();
+            try {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: "environment"
+                        }
+                    });
+                    video.srcObject = stream;
+                    video.setAttribute('playsinline', true);
+                    video.play();
+                    infoElement.textContent = 'Camera started. Scanning for QR code...';
+                    requestAnimationFrame(tick);
+                } else {
+                    infoElement.textContent = 'Camera not supported on this device.';
+                }
+            } catch (err) {
+                console.error(err);
+                infoElement.textContent = 'Error: Could not access camera. Please ensure permissions are granted.';
+            }
+
+            function tick() {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert"
+                    });
+
+                    if (code) {
+                        infoElement.textContent = `QR Code Found!\nData: ${code.data}`;
+                        video.pause();
+                        if (animationFrameId) {
+                            cancelAnimationFrame(animationFrameId);
+                        }
+                        return;
+                    }
+                }
+                animationFrameId = requestAnimationFrame(tick);
+            }
         }
 
-        // File upload handling
+        // --- Upload and Analysis ---
+
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
@@ -864,141 +762,83 @@ Reed-Solomon Parameters (Conceptual):
         function displayUploadedQR(img) {
             const canvas = document.getElementById('uploadedQR');
             const ctx = canvas.getContext('2d');
-            
-            // Set canvas dimensions to match image, or a fixed size if preferred
             canvas.width = img.width;
             canvas.height = img.height;
-            if (canvas.width > 300 || canvas.height > 300) { // Scale down if too large for display
-                const aspectRatio = img.width / img.height;
-                if (aspectRatio > 1) {
-                    canvas.width = 300;
-                    canvas.height = 300 / aspectRatio;
-                } else {
-                    canvas.height = 300;
-                    canvas.width = 300 * aspectRatio;
-                }
-            } else {
-                 canvas.width = 300; // Default size if smaller
-                 canvas.height = 300;
-            }
-            
-            // Clear and draw uploaded image
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             
-            // Show the section
-            document.getElementById('uploadedQRSection').style.display = 'grid'; // Use grid for layout
-            
-            document.getElementById('uploadedInfo').textContent = `
-Uploaded QR Code
-Original Size: ${img.width} x ${img.height} pixels
-Displayed Size: ${canvas.width.toFixed(0)} x ${canvas.height.toFixed(0)} pixels
-Status: Ready for analysis
-Click 'Analyze QR Code' to inspect structure`;
-
-            // Clear previous analysis results
-            document.getElementById('analyzedQR').getContext('2d').clearRect(0,0,300,300);
-            document.getElementById('analysisInfo').textContent = 'Click analyze to inspect QR structure...';
+            document.getElementById('uploadedQRSection').style.display = 'block';
+            document.getElementById('uploadedInfo').textContent = `Uploaded QR Code\nSize: ${img.width} x ${img.height} pixels\nStatus: Ready for analysis\nClick 'Analyze QR Code' to inspect structure`;
         }
 
         function analyzeUploadedQR() {
-            const uploadedCanvas = document.getElementById('uploadedQR');
-            const uploadedCtx = uploadedCanvas.getContext('2d');
-            const imageData = uploadedCtx.getImageData(0, 0, uploadedCanvas.width, uploadedCanvas.height);
+            const canvas = document.getElementById('uploadedQR');
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            const analyzedCanvas = document.getElementById('analyzedQR');
-            const analyzedCtx = analyzedCanvas.getContext('2d');
-
-            // Attempt to decode the uploaded QR code using jsQR
             const code = jsQR(imageData.data, imageData.width, imageData.height);
+            const analysisInfoElement = document.getElementById('analysisInfo');
+            const analyzedQRCanvas = document.getElementById('analyzedQR');
+            const analyzedCtx = analyzedQRCanvas.getContext('2d');
 
             if (code) {
-                // Draw the QR code again on the analyzed canvas, highlighting detected patterns
-                // jsQR provides location data, which is useful for highlighting
-                analyzedCtx.clearRect(0, 0, analyzedCanvas.width, analyzedCanvas.height);
-                analyzedCtx.drawImage(uploadedCanvas, 0, 0, analyzedCanvas.width, analyzedCanvas.height); // Draw original image
+                analyzedCtx.clearRect(0, 0, analyzedQRCanvas.width, analyzedQRCanvas.height);
+                analyzedCtx.drawImage(canvas, 0, 0, analyzedQRCanvas.width, analyzedQRCanvas.height);
 
-                // Draw bounding box
-                analyzedCtx.lineWidth = 4;
-                analyzedCtx.strokeStyle = "#00FF00"; // Green for detected
+                const {
+                    topLeftCorner,
+                    topRightCorner,
+                    bottomLeftCorner,
+                    bottomRightCorner
+                } = code.location;
+
                 analyzedCtx.beginPath();
-                analyzedCtx.moveTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
-                analyzedCtx.lineTo(code.location.topRightCorner.x, code.location.topRightCorner.y);
-                analyzedCtx.lineTo(code.location.bottomRightCorner.x, code.location.bottomRightCorner.y);
-                analyzedCtx.lineTo(code.location.bottomLeftCorner.x, code.location.bottomLeftCorner.y);
-                analyzedCtx.lineTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
+                analyzedCtx.moveTo(topLeftCorner.x, topLeftCorner.y);
+                analyzedCtx.lineTo(topRightCorner.x, topRightCorner.y);
+                analyzedCtx.lineTo(bottomRightCorner.x, bottomRightCorner.y);
+                analyzedCtx.lineTo(bottomLeftCorner.x, bottomLeftCorner.y);
+                analyzedCtx.lineTo(topLeftCorner.x, topLeftCorner.y);
+                analyzedCtx.lineWidth = 4;
+                analyzedCtx.strokeStyle = "#FF3B58";
                 analyzedCtx.stroke();
-
-                // Draw points
-                analyzedCtx.fillStyle = "#FF0000"; // Red for points
-                analyzedCtx.fillRect(code.location.topLeftCorner.x - 5, code.location.topLeftCorner.y - 5, 10, 10);
-                analyzedCtx.fillRect(code.location.topRightCorner.x - 5, code.location.topRightCorner.y - 5, 10, 10);
-                analyzedCtx.fillRect(code.location.bottomLeftCorner.x - 5, code.location.bottomLeftCorner.y - 5, 10, 10);
                 
-                document.getElementById('analysisInfo').textContent = `
-QR Code Analysis:
-Decoded Text: "${code.data}"
-Version: ${code.version}
-Error Correction Level: ${code.errorCorrectionLevel}
-Status: Successfully decoded!
-Confidence: High
-
-Pattern Analysis:
-- Top-left finder: ✅
-- Top-right finder: ✅
-- Bottom-left finder: ✅
-- Timing patterns: ✅ (implied by successful decode)`;
+                analysisInfoElement.textContent = `QR Code Analysis:\nDecoded: ✅\nText: "${code.data}"\nStatus: OK\n\nNote: The red line highlights the detected QR code boundaries.`;
             } else {
-                // If decoding fails, just draw the original image and report failure
-                analyzedCtx.clearRect(0, 0, analyzedCanvas.width, analyzedCanvas.height);
-                analyzedCtx.drawImage(uploadedCanvas, 0, 0, analyzedCanvas.width, analyzedCanvas.height);
+                analyzedCtx.clearRect(0, 0, analyzedQRCanvas.width, analyzedQRCanvas.height);
+                analyzedCtx.drawImage(canvas, 0, 0, analyzedQRCanvas.width, analyzedQRCanvas.height);
                 
-                document.getElementById('analysisInfo').textContent = `
-QR Code Analysis:
-Status: Failed to decode!
-Reason: QR code not found or too damaged.
-Recommendation: Try a clearer image or a less damaged QR code.
-
-Pattern Analysis:
-- Top-left finder: ❌
-- Top-right finder: ❌
-- Bottom-left finder: ❌
-- Timing patterns: ❌ (likely)`;
+                analysisInfoElement.textContent = `QR Code Analysis:\nDecoded: ❌\nStatus: Could not decode.\n\nPossible reasons:\n- Too much damage\n- Poor image quality\n- Not a valid QR code`;
             }
         }
 
-        // Drag and drop functionality
+        // --- Drag and drop functionality ---
+
         const uploadArea = document.getElementById('uploadArea');
-        
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
         });
-        
         uploadArea.addEventListener('dragleave', () => {
             uploadArea.classList.remove('dragover');
         });
-        
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            
             const files = e.dataTransfer.files;
             if (files.length > 0 && files[0].type.startsWith('image/')) {
-                const event = { target: { files: files } };
+                const event = {
+                    target: {
+                        files: files
+                    }
+                };
                 handleFileUpload(event);
             }
         });
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            if (typeof QRCode === 'undefined') {
-                console.error("Error: qrcode.js library (QRCode object) is not defined. Please ensure it's loaded correctly.");
-                document.getElementById('originalInfo').textContent = 'Error: QR Code generator library not loaded.';
-            } else {
-                generateQR();
-            }
-        });
+        window.onload = function() {
+            generateQR();
+        };
     </script>
 </body>
 </html>
